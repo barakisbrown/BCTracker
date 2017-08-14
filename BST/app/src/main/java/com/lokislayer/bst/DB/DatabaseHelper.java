@@ -1,5 +1,6 @@
 package com.lokislayer.bst.DB;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -111,6 +112,39 @@ public class DatabaseHelper extends SQLiteOpenHelper
             onCreate(db);
         }
     }
+
+    /**
+     * Inserts a new reading to the backend.
+     * @param model test reading that will be stored in the backend
+     * @return true if it was done successfully
+     */
+    public boolean insertReadings(BloodSugarModel model)
+    {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues values = new ContentValues();
+
+        values.put(DATE_TESTED, model.getDateTested());
+        values.put(TIME_TESTED, model.getTimeTested());
+        values.put(AMOUNT, model.getAmount());
+
+        long result = db.insert(TABLE_NAME,null,values);
+        db.close();
+
+        totalBloodSugarAround += model.getAmount();
+        avgBloodSugarAmount = totalBloodSugarAround / results.size();
+        if (results.size() == 1)
+        {
+            maxBloodSugarAmount = minBloodSugarAmount = model.getAmount();
+        }
+        else
+        {
+            if (model.getAmount() > maxBloodSugarAmount)
+                minBloodSugarAmount = model.getAmount();
+        }
+
+        return (result > 0) ? true : false;
+    }
+
 
     /**
      * Purges and resets the database back to its default behavior without any rows added.
