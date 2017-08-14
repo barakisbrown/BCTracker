@@ -2,6 +2,7 @@ package com.lokislayer.bst.DB;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
@@ -57,12 +58,14 @@ public class DatabaseHelper extends SQLiteOpenHelper
     private DatabaseHelper(Context context)
     {
         super(context, DB_NAME, null, DB_VERSION);
+        // initialize local properties
         model = new BloodSugarModel();
-        results = new ArrayList<>();
         totalBloodSugarAround = 0;
         minBloodSugarAmount = 0;
         maxBloodSugarAmount = 0;
         avgBloodSugarAmount = 0;
+        // Sync db and internal list
+        results = getAllResults();
     }
 
     /**
@@ -114,6 +117,81 @@ public class DatabaseHelper extends SQLiteOpenHelper
     }
 
     /**
+     * Determines if the TABLE_NAME exists or not
+     * @return true if TABLE_NAME exist, false otherwise
+     */
+    private boolean isEmpty()
+    {
+        SQLiteDatabase db = getReadableDatabase();
+
+        String query = "SELECT DISTINCT tbl_name FROM sqlite_master WHERE tbl_name = '"
+                     + TABLE_NAME + "'";
+
+        Cursor cursor = db.rawQuery(query,null);
+
+        if (cursor != null)
+        {
+            if (cursor.getCount() > 0)
+            {
+                cursor.close();
+                return true;
+            }
+            cursor.close();
+        }
+
+        return false;
+
+
+    }
+
+
+    /**
+     * Loads the internal list of all readings from the backend
+     * @return list of all test readings
+     */
+    private List<BloodSugarModel> getAllResults()
+    {
+        List<BloodSugarModel> tmpReadings = new ArrayList<>();
+
+        if (!isEmpty())
+        {
+            SQLiteDatabase db = getReadableDatabase();
+            String sql = "SELECT * FROM " + TABLE_NAME;
+            Cursor c = db.rawQuery(sql,null);
+
+            if (c.getCount() == 0) return null;
+
+            c.moveToFirst();
+            do
+            {
+                String date = c.getString(c.getColumnIndex(DATE_TESTED));
+                String time = c.getString(c.getColumnIndex(TIME_TESTED));
+                int amount = c.getInt(c.getColumnIndex(AMOUNT));
+
+                totalBloodSugarAround += amount;
+                if (minBloodSugarAmount == 0 && maxBloodSugarAmount == 0)
+                {
+                    minBloodSugarAmount = maxBloodSugarAmount = 0;
+                }
+                if (amount > maxBloodSugarAmount)
+                    maxBloodSugarAmount = amount;
+                if (amount < minBloodSugarAmount)
+                    minBloodSugarAmount = amount;
+
+                model = new BloodSugarModel();
+                model.setAmount(amount);
+                model.setDateTested(date);
+                model.setTimeTested(time);
+                results.add(model);
+            }while(c.moveToNext());
+
+            avgBloodSugarAmount = totalBloodSugarAround / results.size();
+        }
+
+        return results;
+    }
+
+    /**
      * Inserts a new reading to the backend.
      * @param model test reading that will be stored in the backend
      * @return true if it was done successfully
@@ -142,7 +220,7 @@ public class DatabaseHelper extends SQLiteOpenHelper
                 minBloodSugarAmount = model.getAmount();
         }
 
-        return (result > 0) ? true : false;
+        return result > 0;
     }
 
 
